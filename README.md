@@ -66,3 +66,4 @@ MIT License
 - 直接替换 Base 为 `https://api.zyai.online`，后台获取 Key 后即可使用。
 - 价格：每张图片低至 **¥0.15**，显著低于官方 **$0.24**/张。
 - 在界面可一键选择该中转，也可继续填写自定义 Base。
+- 选择ZYAI后 可直接填写 sk-pNYQej3gfPbTdpPADbBb837dBcB0454dAe262c13E5E4D65d  体验使用
