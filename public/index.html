@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gemini 图像工作室 · Banana Edition</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="noise"></div>
+  <header class="nav">
+    <div class="brand">
+      <div class="logo">🍌</div>
+      <div>
+        <div class="brand-title">Banana Image Studio</div>
+        <div class="brand-sub">Gemini 3 Pro / 2.5 Flash Playground</div>
+      </div>
+    </div>
+    <div class="nav-actions">
+      <div class="pill">本地服务 · 端口 9868</div>
+      <span class="pill ghost">MIT 开源</span>
+      <a class="pill ghost" href="https://ai.google.dev/gemini-api/docs/images" target="_blank" rel="noreferrer">官方文档</a>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="hero">
+      <div>
+        <p class="eyebrow">更懂设计的图片生成</p>
+        <h1>把灵感、参考图与精细控制组合到一张图里</h1>
+        <p class="lede">支持 Gemini 3 Pro Image Preview 与 2.5 Flash。可手动填写 Base，或一键使用推荐中转（低至 ¥0.15/张），多轮迭代附带文本解释。</p>
+        <div class="chips subtle prompt-presets" id="prompt-presets">
+          <button class="chip" data-prompt="日落时分的玻璃穹顶温室，柔和体积光，超写实，摄影感">柔光温室</button>
+          <button class="chip" data-prompt="复古未来主义城市街头，霓虹雨夜，银翼杀手色调，胶片颗粒">赛博街景</button>
+          <button class="chip" data-prompt="北欧风客厅产品渲染，浅木质与亚麻布，杂志级布光，8k">家居渲染</button>
+          <button class="chip" data-prompt="手绘扁平插画：宇航员在咖啡馆看书，暖色系，粗描边">插画暖咖</button>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">当前端点</div>
+        <div class="stat-value" id="endpoint-display">请填写 Base 与模型路径</div>
+        <div class="stat-meta" id="status-line">待发起</div>
+        <div class="mini-grid">
+          <div><div class="mini-label">模型</div><div class="mini-value" id="model-pill">gemini-3-pro-image-preview</div></div>
+          <div><div class="mini-label">输出</div><div class="mini-value" id="modalities-pill">IMAGE</div></div>
+          <div><div class="mini-label">响应</div><div class="mini-value" id="latency">—</div></div>
+        </div>
+        <div class="loader tiny" id="top-loader" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel-grid">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>提示与风格</h2>
+          <span class="badge">文本 + 可选参考图</span>
+        </div>
+        <label class="field">
+          <div class="field-top">
+            <span>提示词</span>
+            <span class="muted">描述你想要的画面、风格、光线、情绪等</span>
+          </div>
+          <textarea id="prompt" rows="4" placeholder="例：一只穿工装的水獭站在复古胶片相机旁，日式街头黄昏，胶片质感，暖色调"></textarea>
+        </label>
+        <div class="two-col">
+          <label class="field">
+            <div class="field-top"><span>画幅比例</span><span class="muted">imageConfig.aspectRatio</span></div>
+            <select id="aspect">
+              <option value="1:1">1:1 (方形)</option>
+              <option value="3:4">3:4 竖幅</option>
+              <option value="4:3">4:3 横幅</option>
+              <option value="16:9">16:9 宽屏</option>
+              <option value="9:16">9:16 短视频</option>
+            </select>
+          </label>
+          <label class="field">
+            <div class="field-top"><span>分辨率</span><span class="muted">imageConfig.imageSize</span></div>
+            <select id="size">
+              <option value="1K">1K</option>
+              <option value="2K">2K</option>
+              <option value="4K">4K</option>
+            </select>
+            <div class="small-note" id="size-hint">Pro 支持 1K/2K/4K；Flash 仅 1K</div>
+          </label>
+        </div>
+        <div class="upload-row">
+          <div class="upload-box" id="dropzone">
+            <div class="field-top"><span>参考图片 (拖拽或点击，<=14 张)</span><span class="muted">作为 inlineData 发送</span></div>
+            <input type="file" id="images" accept="image/*" multiple />
+            <div id="image-chips" class="chips subtle"></div>
+            <div id="thumbs" class="thumbs"></div>
+          </div>
+          <div class="notes">
+            <p>小贴士</p>
+            <ul>
+              <li>用参考图做构图或风格迁移</li>
+              <li>提示词具体：材质、灯光、镜头、情绪</li>
+              <li>多轮迭代可复用会话或直接把生成图加入参考</li>
+            </ul>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel">
+        <div class="panel-head">
+          <h2>接口与会话</h2>
+          <span class="badge warm">可选模型 + 响应模式</span>
+        </div>
+        <div class="chips" id="model-presets">
+          <button class="chip active" data-model="pro" data-path="v1beta/models/gemini-3-pro-image-preview:generateContent">Gemini 3 Pro Image Preview</button>
+          <button class="chip" data-model="flash" data-path="v1beta/models/gemini-2.5-flash-image:generateContent">Gemini 2.5 Flash Image</button>
+        </div>
+        <div class="two-col">
+          <label class="field">
+            <div class="field-top"><span>Base</span><span class="muted">如 https://generativelanguage.googleapis.com</span></div>
+            <input type="text" id="base" placeholder="请输入 Base 域名" />
+          </label>
+          <div class="field">
+            <div class="field-top"><span>快速选择</span><span class="muted">可一键填入中转 Base</span></div>
+            <div class="chips" id="base-presets">
+              <button class="chip" data-base="https://api.zyai.online">ZYAI 中转 (¥0.15/张)</button>
+              <button class="chip ghost" data-base="">清空 Base</button>
+            </div>
+          </div>
+          <label class="field">
+            <div class="field-top"><span>模型路径</span><span class="muted">如 v1beta/models/gemini-3-pro-image-preview:generateContent</span></div>
+            <input type="text" id="model" value="v1beta/models/gemini-3-pro-image-preview:generateContent" />
+          </label>
+        </div>
+        <div class="two-col compact">
+          <label class="field">
+            <div class="field-top"><span>输出模式</span><span class="muted">responseModalities</span></div>
+            <select id="modalities">
+              <option value="IMAGE">仅 IMAGE</option>
+              <option value="IMAGE_TEXT">IMAGE + TEXT</option>
+              <option value="TEXT">仅 TEXT</option>
+            </select>
+          </label>
+          <label class="field">
+            <div class="field-top"><span>生成张数</span><span class="muted">固定 1 张</span></div>
+            <select id="count" disabled>
+              <option value="1" selected>1 (固定)</option>
+            </select>
+          </label>
+        </div>
+        <div class="two-col compact">
+          <label class="field">
+            <div class="field-top"><span>种子 Seed (可选)</span><span class="muted">固定可复现</span></div>
+            <input type="number" id="seed" placeholder="留空则随机" />
+          </label>
+          <label class="field switch-row">
+            <div class="field-top"><span>会话记忆</span><span class="muted">保留上一轮文本上下文</span></div>
+            <div class="switch">
+              <label class="remember"><input type="checkbox" id="keep-history" checked /> 继续多轮</label>
+              <button type="button" id="reset-history" class="ghost small">重置会话</button>
+            </div>
+          </label>
+        </div>
+        <label class="field">
+          <div class="field-top"><span>API Key</span><span class="muted">仅在本地存储，不会上传</span></div>
+          <div class="key-row">
+            <input type="password" id="api-key" placeholder="请输入 API Key" />
+            <button type="button" id="toggle-key" class="ghost">显示</button>
+            <label class="remember"><input type="checkbox" id="remember" checked /> 记住密钥 (localStorage)</label>
+          </div>
+        </label>
+        <div class="actions">
+          <button id="generate" class="primary">立即生成</button>
+          <span class="muted" id="quota-info">预估 0 tokens</span>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>请求预览</h2>
+        <span class="badge ghost">发送到 /proxy · base64 已折叠</span>
+      </div>
+      <pre id="request-preview" class="code"></pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>模型文本回应</h2>
+        <span class="badge">TEXT modality</span>
+      </div>
+      <pre id="response-text" class="code muted">等待请求…</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>输出画廊</h2>
+        <span class="badge">自动保存最近 6 张</span>
+      </div>
+      <div id="gallery" class="gallery empty">
+        <div class="placeholder">
+          <p>还没有图片，写个提示词试试看。</p>
+          <p class="muted">支持文字 + 参考图；可切换 Base / 模型；可多轮对话。</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <div class="footer-inner">
+      <div>
+        <div class="footer-title">Banana Image Studio</div>
+        <div class="muted">本地运行 · 代理到 /proxy · MIT License</div>
+      </div>
+      <div class="footer-links">
+        <a href="https://ai.google.dev/gemini-api/docs/images" target="_blank" rel="noreferrer">Gemini Images 文档</a>
+        <a href="https://ai.google.dev/" target="_blank" rel="noreferrer">模型总览</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

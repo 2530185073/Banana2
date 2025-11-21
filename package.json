@@ -1,0 +1,22 @@
+{
+  "name": "banana-image-studio",
+  "version": "1.0.0",
+  "description": "A minimal open-source Gemini image generation studio (Pro Preview & 2.5 Flash) with local proxy.",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "gemini",
+    "image-generation",
+    "frontend",
+    "proxy"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}
