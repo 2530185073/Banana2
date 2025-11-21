@@ -151,7 +151,7 @@
           <label class="field switch-row">
             <div class="field-top"><span>会话记忆</span><span class="muted">保留上一轮文本上下文</span></div>
             <div class="switch">
-              <label class="remember"><input type="checkbox" id="keep-history" checked /> 继续多轮</label>
+              <label class="remember"><input type="checkbox" id="keep-history" /> 继续多轮</label>
               <button type="button" id="reset-history" class="ghost small">重置会话</button>
             </div>
           </label>
@@ -185,6 +185,16 @@
         <span class="badge">TEXT modality</span>
       </div>
       <pre id="response-text" class="code muted">等待请求…</pre>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>请求日志</h2>
+        <span class="badge ghost">按时间倒序 · 本地存储</span>
+      </div>
+      <div id="log-list" class="log-list">
+        <div class="muted">暂无日志</div>
+      </div>
     </section>
 
     <section class="panel">

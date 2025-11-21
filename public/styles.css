@@ -331,3 +331,32 @@ button:disabled { opacity: 0.6; cursor: not-allowed; }
   z-index: 3;
 }
 .toast.show { opacity: 1; transform: translateY(0); }
+
+.log-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 320px;
+  overflow: auto;
+}
+.log-entry {
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.04);
+}
+.log-entry.success { border-color: rgba(110,231,200,0.6); }
+.log-entry.error { border-color: rgba(255,123,123,0.7); }
+.log-entry.warn { border-color: rgba(242,193,78,0.7); }
+.log-entry.info { border-color: rgba(255,255,255,0.12); }
+.log-top { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.log-badge {
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--stroke);
+  background: rgba(255,255,255,0.05);
+  font-weight: 700;
+  font-size: 11px;
+}
+.log-msg { margin-top: 4px; font-weight: 700; color: var(--text); }
+.log-meta { margin-top: 4px; color: var(--muted); font-size: 12px; display: flex; gap: 6px; flex-wrap: wrap; }

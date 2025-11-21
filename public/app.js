@@ -30,6 +30,7 @@ const thumbs = document.getElementById('thumbs');
 const promptPresetBtns = document.querySelectorAll('#prompt-presets .chip');
 const topLoader = document.getElementById('top-loader');
 const sizeHint = document.getElementById('size-hint');
+const logList = document.getElementById('log-list');
 
 const toast = document.createElement('div');
 toast.className = 'toast';
@@ -41,6 +42,13 @@ let conversation = [];
 const MAX_HISTORY = 6;
 const HISTORY_KEY = 'gallery_history';
 const DEBOUNCE_MS = 300;
+const LOG_KEY = 'request_logs';
+const LOG_MAX = 60;
+let logEntries = [];
+const truncateText = (text, limit = 400) => {
+  if (!text) return '';
+  return text.length > limit ? `${text.slice(0, limit)}…(${text.length} chars)` : text;
+};
 
 // 简单防抖，避免频繁重渲染预览
 const debounce = (fn, delay) => {
@@ -156,6 +164,59 @@ const renderImageChips = () => {
   renderThumbs();
 };
 
+const renderLogs = () => {
+  if (!logList) return;
+  logList.innerHTML = '';
+  if (!logEntries.length) {
+    logList.innerHTML = '<div class="muted">暂无日志</div>';
+    return;
+  }
+  logEntries.forEach((log) => {
+    const div = document.createElement('div');
+    div.className = `log-entry ${log.level}`;
+    const metaText = Object.entries(log.meta || {})
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ');
+    div.innerHTML = `
+      <div class="log-top">
+        <span class="log-time">${log.time}</span>
+        <span class="log-badge">${log.level.toUpperCase()}</span>
+      </div>
+      <div class="log-msg">${log.message}</div>
+      ${metaText ? `<div class="log-meta">${metaText}</div>` : ''}
+    `;
+    logList.appendChild(div);
+  });
+};
+
+const addLog = (level, message, meta = {}) => {
+  const now = new Date();
+  const time = now.toLocaleTimeString('zh-CN', { hour12: false });
+  const entry = { level, message, meta, time };
+  logEntries = [entry, ...logEntries].slice(0, LOG_MAX);
+  saveLogs();
+  renderLogs();
+};
+
+const saveLogs = () => {
+  try {
+    localStorage.setItem(LOG_KEY, JSON.stringify(logEntries));
+  } catch (e) {
+    /* ignore */
+  }
+};
+
+const loadLogs = () => {
+  try {
+    const saved = localStorage.getItem(LOG_KEY);
+    if (saved) {
+      logEntries = JSON.parse(saved) || [];
+    }
+  } catch (e) {
+    /* ignore */
+  }
+};
+
 const handleFiles = async (files) => {
   const limited = Array.from(files).slice(0, 14);
   if (!limited.length) return;
@@ -259,16 +320,42 @@ const refreshPreview = () => {
 const debouncedRefreshPreview = debounce(refreshPreview, DEBOUNCE_MS);
 
 const parseImagesFromResponse = (data) => {
-  const candidates = data?.candidates || [];
-  const parts = candidates.flatMap((c) => c?.content?.parts || []);
-  const inlineParts = parts.filter((p) => p?.inlineData || p?.inline_data);
-  return inlineParts.map((p) => {
-    const holder = p.inlineData || p.inline_data;
-    return {
-      url: `data:${holder.mimeType || holder.mime_type || 'image/png'};base64,${holder.data}`,
-      mime: holder.mimeType || holder.mime_type || 'image/png'
-    };
-  });
+  const images = [];
+  const collect = (node) => {
+    if (!node || typeof node !== 'object') return;
+
+    // inlineData / inline_data (base64)
+    const holder = node.inlineData || node.inline_data;
+    if (holder?.data) {
+      images.push({
+        url: `data:${holder.mimeType || holder.mime_type || 'image/png'};base64,${holder.data}`,
+        mime: holder.mimeType || holder.mime_type || 'image/png'
+      });
+    }
+
+    // fileData with uri (API 2024+ 有时返回 fileUri)
+    const fileHolder = node.fileData || node.file_data;
+    if (fileHolder?.fileUri || fileHolder?.file_uri) {
+      images.push({
+        url: fileHolder.fileUri || fileHolder.file_uri,
+        mime: fileHolder.mimeType || fileHolder.mime_type || 'image/png'
+      });
+    }
+
+    // 兼容 media / uri 字段
+    if (node.uri && typeof node.uri === 'string' && node.uri.startsWith('http')) {
+      images.push({ url: node.uri, mime: 'image/png' });
+    }
+
+    // 遍历子节点
+    Object.values(node).forEach((v) => {
+      if (Array.isArray(v)) v.forEach(collect);
+      else if (typeof v === 'object') collect(v);
+    });
+  };
+
+  collect(data);
+  return images;
 };
 
 const parseTextFromResponse = (data) => {
@@ -409,18 +496,12 @@ const loadHistory = () => {
   }
 };
 
-const parseErrorMessage = async (response) => {
-  try {
-    const text = await response.text();
-    const json = JSON.parse(text);
-    const code = json.error?.code || json.code;
-    if (code === 'INVALID_API_KEY') return '❌ API Key 无效，请检查后重试';
-    if (code === 'QUOTA_EXCEEDED') return '⚠️ 配额已用完，请稍后再试';
-    if (code === 401) return '❌ 未授权或 Key 无效';
-    return json.error?.message || json.message || text;
-  } catch (e) {
-    return `请求失败 (${response.status}): ${response.statusText}`;
-  }
+const parseErrorMessage = (status, statusText, rawText, json) => {
+  const code = json?.error?.code || json?.code;
+  if (code === 'INVALID_API_KEY') return '❌ API Key 无效，请检查后重试';
+  if (code === 'QUOTA_EXCEEDED') return '⚠️ 配额已用完，请稍后再试';
+  if (code === 401) return '❌ 未授权或 Key 无效';
+  return json?.error?.message || json?.message || rawText || `请求失败 (${status}): ${statusText}`;
 };
 
 const handleGenerate = async () => {
@@ -434,6 +515,13 @@ const handleGenerate = async () => {
   const endpoint = buildEndpoint();
   const payload = buildPayload();
   refreshPreview();
+  addLog('info', '开始请求', {
+    endpoint,
+    model,
+    aspect: payload.generationConfig.imageConfig.aspectRatio,
+    size: payload.generationConfig.imageConfig.imageSize,
+    modality: figureResponseModalities().join('+')
+  });
 
   if (rememberCheckbox.checked) {
     localStorage.setItem('gemini_api_key', apiKey);
@@ -443,6 +531,7 @@ const handleGenerate = async () => {
 
   setLoading(true);
   const start = performance.now();
+  let alreadyLogged = false;
   try {
     const response = await fetch('/proxy', {
       method: 'POST',
@@ -450,12 +539,18 @@ const handleGenerate = async () => {
       body: JSON.stringify({ endpoint, apiKey, payload })
     });
 
+    const rawText = await response.text();
+    let data = null;
+    try { data = JSON.parse(rawText); } catch (e) { data = null; }
+
     if (!response.ok) {
-      const message = await parseErrorMessage(response);
+      const message = parseErrorMessage(response.status, response.statusText, rawText, data);
+      addLog('error', message, { status: response.status, endpoint, body: truncateText(rawText) });
+      alreadyLogged = true;
       throw new Error(message);
     }
 
-    const data = await response.json();
+    if (!data) data = {};
     const images = parseImagesFromResponse(data);
     const text = parseTextFromResponse(data);
     responseTextEl.textContent = text || '无文本回应或未开启 TEXT 模式';
@@ -467,9 +562,17 @@ const handleGenerate = async () => {
     if (usage) {
       quotaInfo.textContent = `input ${usage.promptTokenCount || usage.promptTokens || 0}, output ${usage.candidatesTokenCount || usage.candidatesTokens || usage.totalTokenCount || 0} tokens`;
     }
+    addLog('success', '生成成功', {
+      status: response.status,
+      elapsed: `${elapsed} ms`,
+      images: images.length,
+      tokens: usage ? `${usage.promptTokenCount || usage.promptTokens || 0} / ${usage.candidatesTokenCount || usage.candidatesTokens || usage.totalTokenCount || 0}` : '未知',
+      body: truncateText(rawText)
+    });
 
     if (!images.length && figureResponseModalities().includes('IMAGE')) {
-      showToast('已返回响应，但未发现图片');
+      showToast('已返回响应，但未发现图片；请检查响应内容/配额或开启 TEXT 查看报错');
+      addLog('warn', '未发现图片', { status: response.status, body: truncateText(rawText) });
       return;
     }
 
@@ -493,6 +596,7 @@ const handleGenerate = async () => {
     statusLine.textContent = err.message;
     responseTextEl.textContent = err.message;
     showToast('请求出错：' + err.message);
+    if (!alreadyLogged) addLog('error', err.message, { endpoint });
   } finally {
     setLoading(false);
   }
@@ -575,3 +679,5 @@ renderImageChips();
 loadHistory();
 refreshPreview();
 updateEndpointDisplay();
+loadLogs();
+renderLogs();
