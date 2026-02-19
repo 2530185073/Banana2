@@ -1,22 +1,32 @@
 {
   "name": "banana-image-studio",
   "version": "1.0.0",
-  "description": "A minimal open-source Gemini image generation studio (Pro Preview & 2.5 Flash) with local proxy.",
+  "description": "本地优先的 Gemini 图像工作室：拖拽多图参考、支持多轮提示，IMAGE/TEXT 双模式，带 token 预估与错误提示，内置本地代理免 CORS，几分钟即可调试 Gemini Pro/Flash 图生图与图文混合案例。",
   "main": "server.js",
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint .",
+    "format": "prettier --write ."
   },
   "keywords": [
     "gemini",
     "image-generation",
+    "ai",
+    "google-generative-ai",
     "frontend",
-    "proxy"
+    "proxy",
+    "china"
   ],
   "author": "",
   "license": "MIT",
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0"
   }
 }
